@@ -46,20 +46,27 @@ class FG_eval {
     // the Solver function below.
 	fg[0] = 0;
 	// minimize our cross track, heading, and velocity errors.
+    const int weight_cte_cost = 1;
+    const int weight_epsi_cost = 1;
+    const int weight_v_cost = 1;
+    const int weight_delta_cost = 1;
+    const int weight_a_cost = 1;
+    const int weight_delta_change_cost = 500;
+    const int weight_a_change_cost = 1;
 	for(int t = 0; t < N; t++) {
-		fg[0] += CppAD::pow(vars[cte_start + t], 2);
-		fg[0] += CppAD::pow(vars[epsi_start + t], 2);
-		fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
+		fg[0] += weight_cte_cost * CppAD::pow(vars[cte_start + t], 2);
+		fg[0] += weight_epsi_cost * CppAD::pow(vars[epsi_start + t], 2);
+		fg[0] += weight_v_cost * CppAD::pow(vars[v_start + t] - ref_v, 2);
 	}
 	// Minimize change-rate.
 	for(int t = 0; t < N - 1; t++) {
-		fg[0] += CppAD::pow(vars[delta_start + t], 2);
-		fg[0] += CppAD::pow(vars[a_start + t], 2);
+		fg[0] += weight_delta_cost * CppAD::pow(vars[delta_start + t], 2);
+		fg[0] += weight_a_cost * CppAD::pow(vars[a_start + t], 2);
 	}
 	// Minimize the value gap between sequential actuations.
 	for(int t = 0; t < N - 2; t++) {
-		fg[0] += 500 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
-		fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+		fg[0] += weight_delta_change_cost * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+		fg[0] += weight_a_change_cost * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
 	}
 	
 	fg[1 + x_start] = vars[x_start];
@@ -94,10 +101,10 @@ class FG_eval {
 		fg[v_start + t + 1] = v1 - (v0 + a0 * dt);
 		
 		AD<double> fxt = coeffs[0] + coeffs[1] * x0 + coeffs[2] * x0*x0 + coeffs[3] * x0*x0*x0 ;
-		fg[cte_start + t + 1] = cte1 - (fxt - y0 + v0 * CppAD::sin(epsi0) * dt);
+		fg[cte_start + t + 1] = cte1 - ((fxt - y0) + (v0 * CppAD::sin(epsi0) * dt));
 		
 		AD<double> psides0 = CppAD::atan(3 * coeffs[3] * x0*x0 + 2 * coeffs[2] * x0 + coeffs[1]);
-		fg[epsi_start + t + 1] = epsi1 - (psi0 - psides0 + v0 * delta0 * dt / Lf); //delta is count-clock
+		fg[epsi_start + t + 1] = epsi1 - ((psi0 - psides0) + v0 * delta0 * dt / Lf); //delta is count-clock
 	}
   }
 };
@@ -118,7 +125,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // element vector and there are 10 timesteps. The number of variables is:
   //
   // 4 * 10 + 2 * 9
-  int n_vars = state.size() * N + 2 * (N - 1);
+  int n_vars = state.size() * N + 2 * (N - 1);  //warning of size_t
   // TODO: Set the number of constraints
   int n_constraints = state.size() * N;
 
@@ -148,7 +155,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   Dvector vars_upperbound(n_vars);
   // TODO: Set lower and upper limits for variables.
   for(int i = x_start; i < delta_start; i++) {
-	  vars_lowerbound[i] = 0;  
+	  vars_lowerbound[i] = std::numeric_limits<double>::min();  
 	  vars_upperbound[i] = std::numeric_limits<double>::max();
   }
 /*
@@ -156,12 +163,12 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 	  vars_lowerbound[i] = 0;  
 	  vars_upperbound[i] = 3.1415926*2;
   }
-  
+  */
   for(int i = v_start; i < cte_start; i++) {
 	  vars_lowerbound[i] = 0;  
 	  vars_upperbound[i] = 120;
   }
-
+/*
   for(int i = cte_start; i < epsi_start; i++) {
 	  vars_lowerbound[i] = 0;  
 	  vars_upperbound[i] = std::numeric_limits<double>::max();
@@ -229,16 +236,15 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   // TODO: Return the first actuator values. The variables can be accessed with
   // `solution.x[i]`.
   //
-  vector<double> result = {solution.x[x_start + 1], solution.x[y_start + 1],
-						  solution.x[psi_start + 1], solution.x[v_start + 1],
-						  solution.x[cte_start + 1], solution.x[epsi_start + 1],
-	                       solution.x[delta_start], solution.x[a_start]};
-						   
-    //for (int indx = 0; indx < N; ++indx)
-    //{
-    //    result.push_back(solution.x[x_start + indx]);
-    //    result.push_back(solution.x[y_start + indx]);
-    //}
+  vector<double> result ;
+  result.push_back(solution.x[delta_start]);
+  result.push_back(solution.x[a_start]);
+  
+  for(int i = 0; i < N; i++) {
+  	result.push_back(solution.x[x_start + i]);
+	result.push_back(solution.x[y_start + i]);
+  }
+  
   // {...} is shorthand for creating a vector, so auto x1 = {1.0,2.0}
   // creates a 2 element double vector.
   return result;

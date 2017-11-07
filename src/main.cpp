@@ -89,22 +89,6 @@ Eigen::VectorXd MapToOdom(double ptx, double pty, double px, double py, double p
 	return pt_car;
 }
 
-Eigen::Vector2f global2local(float ptx, float pty,
-  float rootx, float rooty, float rooto) {
-
-  Eigen::Vector2f pt;
-  pt << ptx, pty;
-
-  Eigen::Vector2f root;
-  root << rootx, rooty;
-
-  Eigen::MatrixXf rot(2,2);
-  rot << cos(rooto), -sin(rooto), sin(rooto), cos(rooto);
-  rot = rot.inverse();
-
-  Eigen::Vector2f pt_local = rot * (pt - root);
-  return pt_local;
-}
 
 int main() {
   uWS::Hub h;
