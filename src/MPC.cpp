@@ -30,7 +30,7 @@ int epsi_start = 5*N;
 int delta_start = 6*N;
 int a_start = 7*N -1;
 
-AD<double> ref_v = 80.0;
+const double ref_v = 80.0;
   
 class FG_eval {
  public:
@@ -196,6 +196,20 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     constraints_lowerbound[i] = 0;
     constraints_upperbound[i] = 0;
   }
+  
+  // set initial state constraints limits 
+  constraints_lowerbound[x_start] = x;
+  constraints_upperbound[x_start] = x;
+  constraints_lowerbound[y_start] = y;
+  constraints_upperbound[y_start] = y;
+  constraints_lowerbound[psi_start] = psi;
+  constraints_upperbound[psi_start] = psi;
+  constraints_lowerbound[v_start] = v;
+  constraints_upperbound[v_start] = v;
+  constraints_lowerbound[cte_start] = cte;
+  constraints_upperbound[cte_start] = cte;
+  constraints_lowerbound[epsi_start] = epsi;
+  constraints_upperbound[epsi_start] = epsi;
 
   // object that computes objective and constraints
   FG_eval fg_eval(coeffs);

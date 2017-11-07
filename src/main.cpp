@@ -17,6 +17,8 @@ using json = nlohmann::json;
 #define N (7)
 #define X_START (0)
 #define Y_START (N)
+#define LF  (2.67)
+#define DT  (0.1)
 
 // For converting back and forth between radians and degrees.
 constexpr double pi() { return M_PI; }
@@ -74,18 +76,18 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
 Eigen::VectorXd MapToOdom(double ptx, double pty, double px, double py, double psi) {
 	Eigen::VectorXd pt_waypoint = Eigen::VectorXd(3);
 	pt_waypoint << ptx, pty, 1;
-	
+
 	Eigen::VectorXd pt_car = Eigen::VectorXd(3);
 	pt_car << 0, 0, 1;
-	
+
 	Eigen::MatrixXd rotation(3,3);
 	rotation << cos(psi),  -sin(psi), px,
 	            sin(psi),   cos(psi), py,
 				0,	        0,        1;
-	rotation = rotation.inverse();			
-				
+	rotation = rotation.inverse();
+
 	pt_car = rotation * pt_waypoint;
-	
+
 	return pt_car;
 }
 
@@ -119,52 +121,59 @@ int main() {
           double v = j[1]["speed"];
 		  double steer_value = j[1]["steering_angle"];
           double throttle_value = j[1]["throttle"];
-		  
+
 		  std::cout << "start ---------------" << std::endl;
 		  std::cout << "ptsx.size() ---------------"  << ptsx.size() << std::endl;
-		  
+
 		  for(int i = 0; i < (int)ptsx.size(); i++) {
 			  Eigen::VectorXd point = MapToOdom(ptsx[i], ptsy[i], px, py, psi);
 			  ptsx[i] = point[0];
 			  ptsy[i] = point[1];
-			  //Eigen::Vector2f localpt = global2local(ptsx[i], ptsy[i], px, py, psi);
-			  //ptsx[i] = localpt[0];
-			  //ptsy[i] = localpt[1];
 		  }
-		  
+
 		  Eigen::VectorXd xvals = Eigen::VectorXd::Map(ptsx.data(), ptsx.size());
 		  Eigen::VectorXd yvals = Eigen::VectorXd::Map(ptsy.data(), ptsy.size());
-		  
-		  Eigen::VectorXd coeffs = polyfit(xvals, yvals, 3);
 
-		  //double cte = polyeval(coeffs, x0) - y0;
+		  auto coeffs = polyfit(xvals, yvals, 3);
+
+		  double cte = polyeval(coeffs, 0) - 0;
 		  double fx_dot = coeffs[1]; //3 * coeffs[3] * xvals[0] * xvals[0] + 2 * coeffs[2] * xvals[0] + coeffs[1];
-		  double epsi = psi - std::atan(fx_dot);
+          double epsi = psi - std::atan(fx_dot);
 		  
+		  
+		  
+		  //because of latency, we should add latency into state
+		  double predict_x = 0 + v * DT;
+		  double predict_y = 0;
+		  double predict_psi = 0 + v * steer_value * DT / LF;
+		  double predict_v = v + throttle_value *  DT;
+		  double predict_cte = cte + v * sin(epsi) * DT;
+		  double predict_epsi = epsi + v * steer_value * DT / LF;
+		  
+		  
+
+
 
 		  Eigen::VectorXd state(6);
-		  
+		  state << predict_x, predict_y, predict_psi, predict_v, predict_cte, predict_epsi;
+
 		  //if(mpc.is_initialized == false) {
-		      Eigen::Vector2f point_vehicle;
-		      point_vehicle = global2local(ptsx[0], ptsy[0], px, py, psi);
-			  cout << "point_vehicle[0]----" << point_vehicle[0] << endl;
-              cout << "point_vehicle[1]----" << point_vehicle[1] << endl;
-		  
+
 		      Eigen::VectorXd point_vehicle0;
 		      point_vehicle0 = MapToOdom(ptsx[0], ptsy[0], px, py, psi);
 			  cout << "point_vehicle0[0]----" << point_vehicle0[0] << endl;
 			  cout << "point_vehicle0[1]----" << point_vehicle0[1] << endl;
-				
-			  state[0] = 0;//point_vehicle[0];
-			  state[1] = 0;//point_vehicle[1];
-			  state[2] = 0;//psi;
-			  state[3] = v;
-			  
-			  double cte = polyeval(coeffs, state[0]) - state[1];
-					  
-			  state[4] = cte;
-			  state[5] = epsi;		  
-			  
+
+			  //state[0] = 0;//point_vehicle[0];
+			  //state[1] = 0;//point_vehicle[1];
+			  //state[2] = 0;//psi;
+			  //state[3] = v;
+
+			  //double cte = polyeval(coeffs, state[0]) - state[1];
+
+			  //state[4] = cte;
+			  //state[5] = epsi;
+
 			  //mpc.is_initialized = true;
 		  //}
 
@@ -182,8 +191,8 @@ int main() {
 		  std::cout << "coeffs[2]: " << coeffs[2] << std::endl;
 		  std::cout << "coeffs[3]: " << coeffs[3] << std::endl;
 		  std::cout << std::endl;
-		  
-		  vector<double> solve = mpc.Solve(state, coeffs);
+
+		  auto solve = mpc.Solve(state, coeffs);
 
           /*
           * TODO: Calculate steering angle and throttle using MPC.
@@ -193,9 +202,9 @@ int main() {
           */
           //double steer_value = solve[0]/deg2rad(25);
           //double throttle_value = solve[1];
-		  steer_value = solve[6]; //deg2rad(25);
-		  throttle_value = solve[7];
-		  
+		  steer_value = solve[0]/deg2rad(25);
+		  throttle_value = solve[1];
+
           std::cout << "steer_value--" << steer_value << std::endl;
           std::cout << "throttle_value--" << throttle_value << std::endl;
 
@@ -206,17 +215,17 @@ int main() {
           msgJson["steering_angle"] = -1.0 * steer_value;
           msgJson["throttle"] = throttle_value;
 
-          //Display the MPC predicted trajectory 
-          vector<double> mpc_x_vals;
-          vector<double> mpc_y_vals;
-		  
+          //Display the MPC predicted trajectory
+          vector<double> mpc_x_vals = {state[0]};
+          vector<double> mpc_y_vals = {state[1]};
+
 		  //auto coeffs3 = polyfit(xvals, yvals, 1);
-		  
-		  for(int i = 0; i < N; i++) {
-			  mpc_x_vals.push_back(solve[X_START + i]);
-			  mpc_y_vals.push_back(solve[Y_START + i]);
+
+		  for(int i = 2; i < (int)solve.size(); i += 2) {
+			  mpc_x_vals.push_back(solve[i]);
+			  mpc_y_vals.push_back(solve[i + 1]);
 		  }
-  
+
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Green line
 
