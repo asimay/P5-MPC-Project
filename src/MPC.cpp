@@ -45,30 +45,35 @@ class FG_eval {
     // NOTE: You'll probably go back and forth between this function and
     // the Solver function below.
 	fg[0] = 0;
-	// minimize our cross track, heading, and velocity errors.
-    const int weight_cte_cost = 1;
-    const int weight_epsi_cost = 1;
+	//weight of cost
+    const int weight_cte_cost = 2000;
+    const int weight_epsi_cost = 2000;
     const int weight_v_cost = 1;
-    const int weight_delta_cost = 1;
-    const int weight_a_cost = 1;
-    const int weight_delta_change_cost = 500;
-    const int weight_a_change_cost = 1;
+    const int weight_delta_cost = 10;
+    const int weight_a_cost = 10;
+    const int weight_delta_change_cost = 100;
+    const int weight_a_change_cost = 10;
+	// minimize our cross track, heading, and velocity errors.
 	for(int t = 0; t < N; t++) {
 		fg[0] += weight_cte_cost * CppAD::pow(vars[cte_start + t], 2);
 		fg[0] += weight_epsi_cost * CppAD::pow(vars[epsi_start + t], 2);
 		fg[0] += weight_v_cost * CppAD::pow(vars[v_start + t] - ref_v, 2);
 	}
+	
 	// Minimize change-rate.
 	for(int t = 0; t < N - 1; t++) {
 		fg[0] += weight_delta_cost * CppAD::pow(vars[delta_start + t], 2);
 		fg[0] += weight_a_cost * CppAD::pow(vars[a_start + t], 2);
 	}
+	
 	// Minimize the value gap between sequential actuations.
 	for(int t = 0; t < N - 2; t++) {
 		fg[0] += weight_delta_change_cost * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
 		fg[0] += weight_a_change_cost * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+		//fg[0] += weight_psi_change_cost * CppAD::pow(vars[psi_start + t + 1] - vars[psi_start + t], 2);
 	}
 	
+    // Initial constraints, fg[0] is used to store cost value.
 	fg[1 + x_start] = vars[x_start];
 	fg[1 + y_start] = vars[y_start];
 	fg[1 + psi_start] = vars[psi_start];
@@ -97,14 +102,14 @@ class FG_eval {
 		// Setup the rest of the model constraints
 		fg[x_start + t + 1] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
 		fg[y_start + t + 1] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
-		fg[psi_start + t + 1] = psi1 - (psi0 + v0 * delta0 * dt / Lf);  //delta is count-clock
+		fg[psi_start + t + 1] = psi1 - (psi0 + v0 * delta0 * dt / Lf);  //remember delta is count-clock
 		fg[v_start + t + 1] = v1 - (v0 + a0 * dt);
 		
-		AD<double> fxt = coeffs[0] + coeffs[1] * x0 + coeffs[2] * x0*x0 + coeffs[3] * x0*x0*x0 ;
-		fg[cte_start + t + 1] = cte1 - ((fxt - y0) + (v0 * CppAD::sin(epsi0) * dt));
+		AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * x0*x0 + coeffs[3] * x0*x0*x0 ;
+		fg[cte_start + t + 1] = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
 		
-		AD<double> psides0 = CppAD::atan(3 * coeffs[3] * x0*x0 + 2 * coeffs[2] * x0 + coeffs[1]);
-		fg[epsi_start + t + 1] = epsi1 - ((psi0 - psides0) + v0 * delta0 * dt / Lf); //delta is count-clock
+		AD<double> psi_des0 = CppAD::atan(3 * coeffs[3] * x0*x0 + 2 * coeffs[2] * x0 + coeffs[1]);
+		fg[epsi_start + t + 1] = epsi1 - ((psi0 - psi_des0) + v0 * delta0 * dt / Lf); //remember delta is count-clock
 	}
   }
 };
@@ -164,7 +169,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 	  vars_upperbound[i] = 3.1415926*2;
   }
   */
-  for(int i = v_start; i < cte_start; i++) {
+  // v constraint
+  for(int i = v_start; i < cte_start; i++) { 
 	  vars_lowerbound[i] = 0;  
 	  vars_upperbound[i] = 120;
   }
@@ -184,8 +190,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
 	  vars_upperbound[i] = 0.436332;   //+25 degree
   }
   for(int i = a_start; i < n_vars; i++) {
-	  vars_lowerbound[i] = -1;  //a:[-1,1]
-	  vars_upperbound[i] = 1;
+	  vars_lowerbound[i] = -0.3;  //a:[-1,1]  , -1 will run back
+	  vars_upperbound[i] = 1.0;
   }
   
   // Lower and upper limits for the constraints
