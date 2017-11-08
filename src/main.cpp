@@ -14,7 +14,7 @@
 // for convenience
 using json = nlohmann::json;
 
-#define N (7)
+
 #define X_START (0)
 #define Y_START (N)
 #define LF  (2.67)
@@ -111,7 +111,7 @@ int main() {
         auto j = json::parse(s);
         string event = j[0].get<string>();
         if (event == "telemetry") {
-          std::cout << "----j---- " << std::endl << j << std::endl;
+          //std::cout << "----j---- " << std::endl << j << std::endl;
           // j[1] is the data JSON object
           vector<double> ptsx = j[1]["ptsx"];
           vector<double> ptsy = j[1]["ptsy"];
@@ -125,7 +125,7 @@ int main() {
 		  std::cout << "start ---------------" << std::endl;
 		  std::cout << "ptsx.size() ---------------"  << ptsx.size() << std::endl;
 
-		  for(int i = 0; i < (int)ptsx.size(); i++) {
+		  for(unsigned int i = 0; i < ptsx.size(); i++) {
 			  Eigen::VectorXd point = MapToOdom(ptsx[i], ptsy[i], px, py, psi);
 			  ptsx[i] = point[0];
 			  ptsy[i] = point[1];
@@ -137,18 +137,22 @@ int main() {
 		  auto coeffs = polyfit(xvals, yvals, 3);
 
 		  double cte = polyeval(coeffs, 0) - 0;
-		  double fx_dot = coeffs[1]; //3 * coeffs[3] * xvals[0] * xvals[0] + 2 * coeffs[2] * xvals[0] + coeffs[1];
-          double epsi = psi - std::atan(fx_dot);
+
 		  
 		  
 		  
 		  //because of latency, we should add latency into state
-		  double predict_x = 0 + v * DT;
-		  double predict_y = 0;
-		  double predict_psi = 0 + v * steer_value * DT / LF;
+		  double predict_psi = 0 - v * steer_value * DT / LF;
+		  double predict_x = 0 + v * cos(predict_psi) * DT;
+		  double predict_y = 0 + v * sin(predict_psi) * DT;
+
 		  double predict_v = v + throttle_value *  DT;
-		  double predict_cte = cte + v * sin(epsi) * DT;
-		  double predict_epsi = epsi + v * steer_value * DT / LF;
+		  double predict_cte = polyeval(coeffs, predict_x);
+		  
+		  double fx_dot = 3 * coeffs[3] * predict_x * predict_x + 2 * coeffs[2] * predict_x + coeffs[1];
+		  double epsi = psi - std::atan(fx_dot);
+		  
+		  double predict_epsi = epsi - v * steer_value * DT / LF;
 		  
 		  
 
@@ -157,26 +161,12 @@ int main() {
 		  Eigen::VectorXd state(6);
 		  state << predict_x, predict_y, predict_psi, predict_v, predict_cte, predict_epsi;
 
-		  //if(mpc.is_initialized == false) {
+
 
 		      Eigen::VectorXd point_vehicle0;
 		      point_vehicle0 = MapToOdom(ptsx[0], ptsy[0], px, py, psi);
 			  cout << "point_vehicle0[0]----" << point_vehicle0[0] << endl;
 			  cout << "point_vehicle0[1]----" << point_vehicle0[1] << endl;
-
-			  //state[0] = 0;//point_vehicle[0];
-			  //state[1] = 0;//point_vehicle[1];
-			  //state[2] = 0;//psi;
-			  //state[3] = v;
-
-			  //double cte = polyeval(coeffs, state[0]) - state[1];
-
-			  //state[4] = cte;
-			  //state[5] = epsi;
-
-			  //mpc.is_initialized = true;
-		  //}
-
 
 
 		  std::cout << std::endl;
@@ -200,8 +190,7 @@ int main() {
           * Both are in between [-1, 1].
           *
           */
-          //double steer_value = solve[0]/deg2rad(25);
-          //double throttle_value = solve[1];
+
 		  steer_value = solve[0]/deg2rad(25);
 		  throttle_value = solve[1];
 
@@ -221,7 +210,7 @@ int main() {
 
 		  //auto coeffs3 = polyfit(xvals, yvals, 1);
 
-		  for(int i = 2; i < (int)solve.size(); i += 2) {
+		  for(unsigned int i = 2; i < solve.size(); i += 2) {
 			  mpc_x_vals.push_back(solve[i]);
 			  mpc_y_vals.push_back(solve[i + 1]);
 		  }
@@ -235,12 +224,18 @@ int main() {
           //Display the waypoints/reference line
           vector<double> next_x_vals;
           vector<double> next_y_vals;
-
-		  next_x_vals = ptsx;
-		  next_y_vals = ptsy;
-
+next_x_vals = ptsx;
+next_y_vals = ptsy;
           //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
           // the points in the simulator are connected by a Yellow line
+		  /*double points_unit = 2;
+		  int number_points = 50;
+		  
+		  for(int i = 1; i < number_points; i++) {
+		    double x = i * points_unit;
+		  	next_x_vals.push_back(x);
+			next_y_vals.push_back(polyeval(coeffs, x));
+		  }*/
 
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
