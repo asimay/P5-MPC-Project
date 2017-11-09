@@ -146,58 +146,48 @@ int main()
 
                     std::cout << "start ---------------" << std::endl;
                     std::cout << "ptsx.size() ---------------"  << ptsx.size() << std::endl;
+					
+					Eigen::VectorXd ptsx_vehicle(ptsx.size());
+					Eigen::VectorXd ptsy_vehicle(ptsy.size());
 
                     //transform from map coordinator to odom coordinator
                     for(unsigned int i = 0; i < ptsx.size(); i++)
                     {
                         Eigen::VectorXd point = MapToOdom(ptsx[i], ptsy[i], px, py, psi);
-                        ptsx[i] = point[0];
-                        ptsy[i] = point[1];
+                        ptsx_vehicle[i] = point[0];
+                        ptsy_vehicle[i] = point[1];
+						
+					//	double x = ptsx[i] - px;
+                    //    double y = ptsy[i] - py;
+                     //   ptsx_vehicle[i] = x * cos(-psi) - y * sin(-psi);
+                     //   ptsy_vehicle[i] = x * sin(-psi) + y * cos(-psi);
                     }
 
-                    Eigen::VectorXd xvals = Eigen::VectorXd::Map(ptsx.data(), ptsx.size());
-                    Eigen::VectorXd yvals = Eigen::VectorXd::Map(ptsy.data(), ptsy.size());
-
                     //fit 3 order polynomial
-                    auto coeffs = polyfit(xvals, yvals, 3);
+                    auto coeffs = polyfit(ptsx_vehicle, ptsy_vehicle, 3);
 
                     //initial cte is based on vehicle origin position(x,y) : (0,0)
                     double cte = polyeval(coeffs, 0) - 0;
 
+                    double epsi = 0 - std::atan(coeffs[1]);
                     //because of latency, we should add latency into state
                     //initial state [x,y,psi,v,cte,epsi] is [0,0,0,v,cte,epsi]
-                    double predict_psi = 0 + v * steer_value * DT / LF; //delta is counter-clock
-                    double predict_x = 0 + v * cos(predict_psi) * DT;
-                    double predict_y = 0 + v * sin(predict_psi) * DT;
+                    double predict_psi = 0 + v * (-steer_value) * DT / LF; //delta is counter-clock
+                    double predict_x = 0 + v * cos(0) * DT;
+                    double predict_y = 0 + v * sin(0) * DT;
 
                     double predict_v = v + throttle_value *  DT;
 
-                    double fx_dot = 3 * coeffs[3] * predict_x * predict_x + 2 * coeffs[2] * predict_x + coeffs[1];
-                    double epsi = 0 - std::atan(fx_dot);
+                    //double fx_dot = 3 * coeffs[3] * predict_x * predict_x + 2 * coeffs[2] * predict_x + coeffs[1];
+
 
                     double predict_cte = cte + v * sin(epsi) * DT;     //polyeval(coeffs, predict_x);
-                    double predict_epsi = epsi + v * steer_value * DT / LF;
+                    double predict_epsi = epsi + v * (-steer_value) * DT / LF;
+
 
                     Eigen::VectorXd state(6);
                     state << predict_x, predict_y, predict_psi, predict_v, predict_cte, predict_epsi;
 
-                    Eigen::VectorXd point_vehicle0;
-                    point_vehicle0 = MapToOdom(ptsx[0], ptsy[0], px, py, psi);
-                    cout << "point_vehicle0[0]----" << point_vehicle0[0] << endl;
-                    cout << "point_vehicle0[1]----" << point_vehicle0[1] << endl;
-
-                    std::cout << std::endl;
-                    std::cout << "px: " << state[0] << std::endl;
-                    std::cout << "py: " << state[1] << std::endl;
-                    std::cout << "psi: " << state[2] << std::endl;
-                    std::cout << "v: " << state[3] << std::endl;
-                    std::cout << "cte: " << state[4] << std::endl;
-                    std::cout << "epsi: " << state[5] << std::endl;
-                    std::cout << "coeffs[0]: " << coeffs[0] << std::endl;
-                    std::cout << "coeffs[1]: " << coeffs[1] << std::endl;
-                    std::cout << "coeffs[2]: " << coeffs[2] << std::endl;
-                    std::cout << "coeffs[3]: " << coeffs[3] << std::endl;
-                    std::cout << std::endl;
 
                     auto solve = mpc.Solve(state, coeffs);
 
@@ -208,7 +198,7 @@ int main()
                     *
                     */
 
-                    steer_value = solve[0]/deg2rad(25);
+                    steer_value = solve[0]/(deg2rad(25) * LF);
                     throttle_value = solve[1];
 
                     std::cout << "steer_value--" << steer_value << std::endl;
@@ -218,7 +208,7 @@ int main()
                     json msgJson;
                     // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.
                     // Otherwise the values will be in between [-deg2rad(25), deg2rad(25] instead of [-1, 1].
-                    msgJson["steering_angle"] = -1.0 * steer_value;
+                    msgJson["steering_angle"] = steer_value;
                     msgJson["throttle"] = throttle_value;
 
                     //Display the MPC predicted trajectory
@@ -240,19 +230,20 @@ int main()
                     //Display the waypoints/reference line
                     vector<double> next_x_vals;
                     vector<double> next_y_vals;
-                    next_x_vals = ptsx;
-                    next_y_vals = ptsy;
+                    //next_x_vals = ptsx;
+                    //next_y_vals = ptsy;
 
                     //.. add (x,y) points to list here, points are in reference to the vehicle's coordinate system
                     // the points in the simulator are connected by a Yellow line
-                    /*double points_unit = 2;
-                    int number_points = 50;
+                    double points_unit = 2;
+                    int number_points = 25;
 
-                    for(int i = 1; i < number_points; i++) {
-                      double x = i * points_unit;
+                    for(int i = 1; i < number_points; i++) 
+					{
+                        double x = i * points_unit;
                     	next_x_vals.push_back(x);
-                    next_y_vals.push_back(polyeval(coeffs, x));
-                    }*/
+                        next_y_vals.push_back(polyeval(coeffs, x));
+                    }
 
                     msgJson["next_x"] = next_x_vals;
                     msgJson["next_y"] = next_y_vals;

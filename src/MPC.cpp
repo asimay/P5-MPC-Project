@@ -8,7 +8,7 @@ using CppAD::AD;
 
 // TODO: Set the timestep length and duration
 size_t N = 10;
-AD<double> dt = 0.1;
+double dt = 0.1;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -20,7 +20,7 @@ AD<double> dt = 0.1;
 // presented in the classroom matched the previous radius.
 //
 // This is the length from front to CoG that has a similar radius.
-const AD<double> Lf = 2.67;
+const double Lf = 2.67;
 
 //set the start index for var and fg vector.
 size_t x_start = 0;
@@ -32,7 +32,7 @@ size_t epsi_start = 5*N;
 size_t delta_start = 6*N;
 size_t a_start = 7*N -1;
 
-const AD<double> ref_v = 80.0;
+const double ref_v = 100.0;
 
 class FG_eval
 {
@@ -54,13 +54,14 @@ public:
         fg[0] = 0;
 
         //weight of cost
-        AD<int>  weight_cte_cost = 200;
-        AD<int>  weight_epsi_cost = 200;
-        AD<int>  weight_v_cost = 0.1;
-        AD<int>  weight_delta_cost = 1;
-        AD<int>  weight_a_cost = 1;
-        AD<int>  weight_delta_change_cost = 500;
-        AD<int>  weight_a_change_cost = 1;
+        int  weight_cte_cost = 2000;
+        int  weight_epsi_cost = 2000;
+        int  weight_v_cost = 1;
+        int  weight_delta_cost = 10;
+        int  weight_a_cost = 10;
+        int  weight_delta_change_cost = 100;
+        int  weight_a_change_cost = 10;
+		int  weight_psi_change_cost = 1;
 
         // minimize our cross track, heading, and velocity errors.
         for(unsigned int t = 0; t < N; t++)
@@ -115,14 +116,14 @@ public:
             // Setup the rest of the model constraints
             fg[x_start + t + 1] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
             fg[y_start + t + 1] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
-            fg[psi_start + t + 1] = psi1 - (psi0 + (v0 * delta0 * dt / Lf));  //remember delta is count-clock
+            fg[psi_start + t + 1] = psi1 - (psi0 - (v0 * delta0 * dt / Lf));  //remember delta is count-clock
             fg[v_start + t + 1] = v1 - (v0 + a0 * dt);
 
             AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * x0*x0 + coeffs[3] * x0*x0*x0 ;
             fg[cte_start + t + 1] = cte1 - ((f0 - y0) + (v0 * CppAD::sin(epsi0) * dt));
 
             AD<double> psi_des0 = CppAD::atan(3 * coeffs[3] * x0*x0 + 2 * coeffs[2] * x0 + coeffs[1]);
-            fg[epsi_start + t + 1] = epsi1 - ((psi0 - psi_des0) + (v0 * delta0 * dt / Lf)); //remember delta is count-clock
+            fg[epsi_start + t + 1] = epsi1 - ((psi0 - psi_des0) - (v0 * delta0 * dt / Lf)); //remember delta is count-clock
         }
     }
 };
@@ -157,12 +158,12 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
     }
 
     // Set the initial variable values
-    AD<double> x = state[0];
-    AD<double> y = state[1];
-    AD<double> psi = state[2];
-    AD<double> v = state[3];
-    AD<double> cte = state[4];
-    AD<double> epsi = state[5];
+    double x = state[0];
+    double y = state[1];
+    double psi = state[2];
+    double v = state[3];
+    double cte = state[4];
+    double epsi = state[5];
 
     vars[x_start] = x;
     vars[y_start] = y;
@@ -176,20 +177,21 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
     // TODO: Set lower and upper limits for variables.
     for(unsigned int i = x_start; i < delta_start; i++)
     {
-        vars_lowerbound[i] = CppAD::numeric_limits<double>::min(); //-1.0e19;  //std::numeric_limits<double>::min();  //will output error
-        vars_upperbound[i] = CppAD::numeric_limits<double>::max(); //1.0e19;   //std::numeric_limits<double>::max();
+        vars_lowerbound[i] = -1.0e10; //CppAD::numeric_limits<double>::min();  //CppAD::numeric_limits will output error
+        vars_upperbound[i] = 1.0e10;  //CppAD::numeric_limits<double>::max(); 
     }
-    /*
-      for(int i = psi_start; i < v_start; i++) {
-    	  vars_lowerbound[i] = 0;
-    	  vars_upperbound[i] = 3.1415926*2;
-      }
-      */
+	
+    
+     /* for(unsigned int i = psi_start; i < v_start; i++) {
+    	  vars_lowerbound[i] = -3.1415926;
+    	  vars_upperbound[i] = 3.1415926;
+      }*/
+    
     // v constraint
     for(unsigned int i = v_start; i < cte_start; i++)
     {
         vars_lowerbound[i] = 0;
-        vars_upperbound[i] = 100;
+        vars_upperbound[i] = 100.0;
     }
     /*
       for(int i = cte_start; i < epsi_start; i++) {
@@ -197,11 +199,11 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs)
     	  vars_upperbound[i] = std::numeric_limits<double>::max();
       }
 
-      for(int i = epsi_start; i < delta_start; i++) {
-    	  vars_lowerbound[i] = 0;
-    	  vars_upperbound[i] = 3.1415926*2;
-      }
-      */
+      for(unsigned int i = epsi_start; i < delta_start; i++) {
+    	  vars_lowerbound[i] = -3.1415926;
+    	  vars_upperbound[i] = 3.1415926;
+      }*/
+      
     for(unsigned int i = delta_start; i < a_start; i++)   //delta:[-25,25] degree
     {
         vars_lowerbound[i] = -0.436332;  //-25 degree
