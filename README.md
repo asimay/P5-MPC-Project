@@ -15,6 +15,7 @@ The goals / steps of this project are the following:
 [image7]: ./outputs/2-80kmh.png
 [image8]: ./outputs/8.png
 [image9]: ./outputs/9.png
+[image10]: ./outputs/equation.png
 
 Final result:
 
@@ -64,7 +65,12 @@ double predict_epsi = epsi + v * (-steer_value) * DT / LF;
 
 #### 5. Use **IPOPT** to solve the control variables's optimization.
 
-1. In the first step, I tuned `N = 10` and `dt = 0.1`, and `ref_v = 80.0`,
+1. MPC Model equation described as belows:
+
+![alt text][image10]
+
+
+2. In the first step, I tuned `N = 10` and `dt = 0.1`, and `ref_v = 80.0`,
 and set constraints and weights for control variables & fg, and plot the data to tune the code, for example, weights of `[cte, epsi, v, delta, a, delta_change, a_change, epsi_change]` from `[3500， 2000， 1， 10， 10， 200， 10， 0.8]` to:
 
 for steering angle weights:
