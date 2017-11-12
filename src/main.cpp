@@ -131,8 +131,8 @@ int main() {
                     double steer_value = j[1]["steering_angle"];
                     double throttle_value = j[1]["throttle"];
 
-                    std::cout << "start ---------------" << std::endl;
-                    std::cout << "ptsx.size() ---------------"  << ptsx.size() << std::endl;
+                    //std::cout << "start ---------------" << std::endl;
+                    //std::cout << "ptsx.size() ---------------"  << ptsx.size() << std::endl;
 
                     Eigen::VectorXd ptsx_vehicle(ptsx.size());
                     Eigen::VectorXd ptsy_vehicle(ptsy.size());
@@ -176,8 +176,8 @@ int main() {
                     steer_value = solve[0]/(deg2rad(25) * LF);
                     throttle_value = solve[1];
 
-                    std::cout << "steer_value--" << steer_value << std::endl;
-                    std::cout << "throttle_value--" << throttle_value << std::endl;
+                    //std::cout << "steer_value--" << steer_value << std::endl;
+                    //std::cout << "throttle_value--" << throttle_value << std::endl;
 
                     json msgJson;
                     // NOTE: Remember to divide by deg2rad(25) before you send the steering value back.

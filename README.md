@@ -6,13 +6,15 @@ The goals / steps of this project are the following:
 ---
 
 [//]: # (Image References)
-[image1]: ./outputs/1.png
+[image1]: ./outputs/final.gif
 [image2]: ./outputs/cte_plot_3500.png
 [image3]: ./outputs/cte_plot_10000.png
 [image4]: ./outputs/two_value_plot1.png
 [image5]: ./outputs/two_value_plot2.png
 [image6]: ./outputs/1-80kmh.png
 [image7]: ./outputs/2-80kmh.png
+[image8]: ./outputs/8.png
+[image9]: ./outputs/9.png
 
 Final result:
 
@@ -24,7 +26,9 @@ Final result:
 
 This program need:
 * **Ipopt and CppAD** 
-* [**matplotlib wrapper**](https://github.com/lava/matplotlib-cpp), I've included it in head file, but you still need to setup the environment under ubuntu, installation step:
+* [**matplotlib wrapper**](https://github.com/lava/matplotlib-cpp)
+
+I've included it in head file, but you still need to setup the environment under ubuntu, installation step:
 
 ```
 sudo apt-get install python-matplotlib python-numpy python2.7-dev
@@ -36,6 +40,7 @@ sudo apt-get install python-matplotlib python-numpy python2.7-dev
 #### 1. Read the planner data, and transform from map coordinate to odom coordinate.
 
 The waypoints data is in global coordinate, so we must transform the data into odom coordinate, the odom coordinate's origin is vehicle's origin, and `x`, `y` is the vehicle's run distance. 
+
 In code, I write a function `Eigen::VectorXd MapToOdom(double ptx, double pty, double px, double py, double psi)` to do the transformation.
 
 #### 2. Fit the 3 order polynomial.
@@ -46,7 +51,7 @@ With above data, I did the 3 order polynomial for the data, this will used for f
 
 Do the prediction with latency:
 
-```
+```cpp
 double predict_x = 0 + v * cos(0) * DT;
 double predict_y = 0 + v * sin(0) * DT;
 double predict_psi = 0 + v * (-steer_value) * DT / LF; //delta is counter-clock
@@ -85,7 +90,7 @@ cte from 3500 to 10000:
 
 The Final tuned weights as belows:
 
-```
+```cpp
 //weight of variables' cost
 int  weight_cte_cost = 3500;
 int  weight_epsi_cost = 2000;
@@ -97,14 +102,17 @@ int  weight_a_change_cost = 10;
 int  weight_epsi_change_cost = 0.8;
 ```
 
-the screenshot of simulation as below:
+with above parameters, the car runs very well in simulation, almost always in the middle of road all the time, no ties out of road. 
+
+The screenshot of simulation as below:
 
 ![alt text][image6]
 ![alt text][image7]
 
+
 **Remember**, above parameter is based on `v_ref = 80, v_constraint = 100`, and `N = 10` and `dt = 0.1`.
 
-In this situation, the vehicle is successfully run around the lake, but the vehicle's speed is below 80MPH, especially when turning, it will down to about 40MPH.
+In this situation, the vehicle is successfully run around the lake, but the vehicle's speed is equal or below **80MPH**, especially when turning, it will down to about 40MPH.
 
 **I want to challenge myself, and hope the car can run at 100MPH.**
 
@@ -114,7 +122,7 @@ after about `more than20 groups combined parameters` tuned, I finally tuned the 
 
 
 
-```
+```cpp
 //weight of variables' cost
 int  weight_cte_cost = 30000;
 int  weight_epsi_cost = 110;
@@ -126,12 +134,19 @@ int  weight_a_change_cost = 10;
 int  weight_epsi_change_cost = 20;
 ```
 
-the data plot result examples are shown as below:  
+I expand the iterater times to 200 to observe more cases, the data plot result examples are shown as below:  
 
 ![alt text][image4]
 ![alt text][image5]
 
 #### 6. Output the MPC predicted trajectory and reference trajectory.
+
+with new tuned parameters, the car runs good in simulation based on `v_ref = 100` condition, and the car speed can run at about **95MPH**.
+
+The screenshot of simulation as below:
+
+![alt text][image8]
+![alt text][image9]
 
 
 ## Final conclusion:
