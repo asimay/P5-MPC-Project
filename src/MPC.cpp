@@ -8,7 +8,7 @@ using CppAD::AD;
 
 // TODO: Set the timestep length and duration
 size_t N = 10;
-double dt = 0.08;
+double dt = 0.09;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -51,14 +51,14 @@ class FG_eval {
         fg[0] = 0;
 
         //weight of cost
-        int  weight_cte_cost = 3500;
-        int  weight_epsi_cost = 2000;
-        int  weight_v_cost = 1;
-        int  weight_delta_cost = 10;
-        int  weight_a_cost = 10;
-        int  weight_delta_change_cost = 200;
+        int  weight_cte_cost = 30000;
+        int  weight_epsi_cost = 110;
+        int  weight_v_cost = 10;
+        int  weight_delta_cost = 2000;
+        int  weight_a_cost = 20;
+        int  weight_delta_change_cost = 30000;
         int  weight_a_change_cost = 10;
-        int  weight_epsi_change_cost = 0.08;
+        int  weight_epsi_change_cost = 6;
 
         // minimize our cross track, heading, and velocity errors.
         for(unsigned int t = 0; t < N; t++) {
@@ -179,7 +179,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     // v constraint
     for(unsigned int i = v_start; i < cte_start; i++) {
         vars_lowerbound[i] = 0;
-        vars_upperbound[i] = 100.0;
+        vars_upperbound[i] = 140.0;
     }
 
     /*

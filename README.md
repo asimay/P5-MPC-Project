@@ -1,108 +1,139 @@
 # CarND-Controls-MPC
-Self-Driving Car Engineer Nanodegree Program
+The goals / steps of this project are the following:
+
+* Implement Model Predictive Control to drive the car around the track, calculate CTE by yourself, and there's a 100 millisecond latency between actuations commands on top of the connection latency.
+
+---
+
+[//]: # (Image References)
+[image1]: ./outputs/1.png
+[image2]: ./outputs/cte_plot_3500.png
+[image3]: ./outputs/cte_plot_10000.png
+[image4]: ./outputs/two_value_plot1.png
+[image5]: ./outputs/two_value_plot2.png
+[image6]: ./outputs/1-80kmh.png
+[image7]: ./outputs/2-80kmh.png
+
+Final result:
+
+![alt text][image1]
 
 ---
 
 ## Dependencies
 
-* cmake >= 3.5
- * All OSes: [click here for installation instructions](https://cmake.org/install/)
-* make >= 4.1(mac, linux), 3.81(Windows)
-  * Linux: make is installed by default on most Linux distros
-  * Mac: [install Xcode command line tools to get make](https://developer.apple.com/xcode/features/)
-  * Windows: [Click here for installation instructions](http://gnuwin32.sourceforge.net/packages/make.htm)
-* gcc/g++ >= 5.4
-  * Linux: gcc / g++ is installed by default on most Linux distros
-  * Mac: same deal as make - [install Xcode command line tools]((https://developer.apple.com/xcode/features/)
-  * Windows: recommend using [MinGW](http://www.mingw.org/)
-* [uWebSockets](https://github.com/uWebSockets/uWebSockets)
-  * Run either `install-mac.sh` or `install-ubuntu.sh`.
-  * If you install from source, checkout to commit `e94b6e1`, i.e.
-    ```
-    git clone https://github.com/uWebSockets/uWebSockets
-    cd uWebSockets
-    git checkout e94b6e1
-    ```
-    Some function signatures have changed in v0.14.x. See [this PR](https://github.com/udacity/CarND-MPC-Project/pull/3) for more details.
+This program need:
+* **Ipopt and CppAD** 
+* [**matplotlib wrapper**](https://github.com/lava/matplotlib-cpp), I've included it in head file, but you still need to setup the environment under ubuntu, installation step:
 
-* **Ipopt and CppAD:** Please refer to [this document](https://github.com/udacity/CarND-MPC-Project/blob/master/install_Ipopt_CppAD.md) for installation instructions.
-* [Eigen](http://eigen.tuxfamily.org/index.php?title=Main_Page). This is already part of the repo so you shouldn't have to worry about it.
-* Simulator. You can download these from the [releases tab](https://github.com/udacity/self-driving-car-sim/releases).
-* Not a dependency but read the [DATA.md](./DATA.md) for a description of the data sent back from the simulator.
+```
+sudo apt-get install python-matplotlib python-numpy python2.7-dev
+```
+
+## Model Predictive Control  Process
 
 
-## Basic Build Instructions
+#### 1. Read the planner data, and transform from map coordinate to odom coordinate.
 
-1. Clone this repo.
-2. Make a build directory: `mkdir build && cd build`
-3. Compile: `cmake .. && make`
-4. Run it: `./mpc`.
+The waypoints data is in global coordinate, so we must transform the data into odom coordinate, the odom coordinate's origin is vehicle's origin, and `x`, `y` is the vehicle's run distance. 
+In code, I write a function `Eigen::VectorXd MapToOdom(double ptx, double pty, double px, double py, double psi)` to do the transformation.
 
-## Tips
+#### 2. Fit the 3 order polynomial.
 
-1. It's recommended to test the MPC on basic examples to see if your implementation behaves as desired. One possible example
-is the vehicle starting offset of a straight line (reference). If the MPC implementation is correct, after some number of timesteps
-(not too many) it should find and track the reference line.
-2. The `lake_track_waypoints.csv` file has the waypoints of the lake track. You could use this to fit polynomials and points and see of how well your model tracks curve. NOTE: This file might be not completely in sync with the simulator so your solution should NOT depend on it.
-3. For visualization this C++ [matplotlib wrapper](https://github.com/lava/matplotlib-cpp) could be helpful.)
-4.  Tips for setting up your environment are available [here](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/0949fca6-b379-42af-a919-ee50aa304e6a/lessons/f758c44c-5e40-4e01-93b5-1a82aa4e044f/concepts/23d376c7-0195-4276-bdf0-e02f1f3c665d)
-5. **VM Latency:** Some students have reported differences in behavior using VM's ostensibly a result of latency.  Please let us know if issues arise as a result of a VM environment.
+With above data, I did the 3 order polynomial for the data, this will used for fit polynomial the waypoints and MPC predictive calculation.
 
-## Editor Settings
+#### 3. Because of latency, we should add latency into state.
 
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
+Do the prediction with latency:
 
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
+```
+double predict_x = 0 + v * cos(0) * DT;
+double predict_y = 0 + v * sin(0) * DT;
+double predict_psi = 0 + v * (-steer_value) * DT / LF; //delta is counter-clock
+double predict_v = v + throttle_value *  DT;
+double predict_cte = cte + v * sin(epsi) * DT;    
+double predict_epsi = epsi + v * (-steer_value) * DT / LF;
+```
 
-## Code Style
+#### 4. Initialize the state with latency prediction state.
 
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
+#### 5. Use **IPOPT** to solve the control variables's optimization.
 
-## Project Instructions and Rubric
+1. In the first step, I tuned `N = 10` and `dt = 0.1`, and `ref_v = 80.0`,
+and set constraints and weights for control variables & fg, and plot the data to tune the code, for example, weights of `[cte, epsi, v, delta, a, delta_change, a_change, epsi_change]` from `[3500， 2000， 1， 10， 10， 200， 10， 0.8]` to:
 
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
+for steering angle weights:
 
-More information is only accessible by people who are already enrolled in Term 2
-of CarND. If you are enrolled, see [the project page](https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/f1820894-8322-4bb3-81aa-b26b3c6dcbaf/lessons/b1ff3be0-c904-438e-aad3-2b5379f0e0c3/concepts/1a2255a0-e23c-44cf-8d41-39b8a3c8264a)
-for instructions and the project rubric.
+  1) `[3500， 2000， 1， 10， 10， 200， 10， 0.8]`
+  2) `[3500， 2000， 1， 10， 10， 500， 10， 0.8]`
+  3) `[3500， 2000， 1， 10， 10， 1000， 10， 0.8]`
+  4) `[3500， 2000， 1， 10， 10， 2000， 10， 0.8]`  
+  5) `[3500， 2000， 1， 10， 10， 3000， 10， 0.8]`  
 
-## Hints!
+for cte weights:
+  1) `[3500， 2000， 1， 10， 10， 3000， 10， 0.8]`  
+  2) `[5500， 2000， 1， 10， 10， 3000， 10， 0.8]`    
+  3) `[8500， 2000， 1， 10， 10， 3000， 10， 0.8]`     
+  4) `[10000， 2000， 1， 10， 10， 3000， 10， 0.8]`   
+  5) `[15000， 2000， 1， 10， 10， 3000， 10， 0.8]`   
 
-* You don't have to follow this directory structure, but if you do, your work
-  will span all of the .cpp files here. Keep an eye out for TODOs.
+and for every parameter tuning, I will not list at here. the data plot result examples are shown as below:  
+cte from 3500 to 10000:
 
-## Call for IDE Profiles Pull Requests
+![alt text][image2]
+![alt text][image3]
 
-Help your fellow students!
+The Final tuned weights as belows:
 
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to we ensure
-that students don't feel pressured to use one IDE or another.
+```
+//weight of variables' cost
+int  weight_cte_cost = 3500;
+int  weight_epsi_cost = 2000;
+int  weight_v_cost = 1;
+int  weight_delta_cost = 10;
+int  weight_a_cost = 10;
+int  weight_delta_change_cost = 3000;
+int  weight_a_change_cost = 10;
+int  weight_epsi_change_cost = 0.8;
+```
 
-However! I'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
+the screenshot of simulation as below:
 
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
+![alt text][image6]
+![alt text][image7]
 
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
+**Remember**, above parameter is based on `v_ref = 80, v_constraint = 100`, and `N = 10` and `dt = 0.1`.
 
-Frankly, I've never been involved in a project with multiple IDE profiles
-before. I believe the best way to handle this would be to keep them out of the
-repo root to avoid clutter. My expectation is that most profiles will include
-instructions to copy files to a new location to get picked up by the IDE, but
-that's just a guess.
+In this situation, the vehicle is successfully run around the lake, but the vehicle's speed is below 80MPH, especially when turning, it will down to about 40MPH.
 
-One last note here: regardless of the IDE used, every submitted project must
-still be compilable with cmake and make./
+**I want to challenge myself, and hope the car can run at 100MPH.**
 
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
+So I changed the base condition above, I tuned the parameter based on `v_ref = 100, v_constraint = 140`, and `N = 10` and `dt = 0.09`.
+
+after about `more than20 groups combined parameters` tuned, I finally tuned the parameters at:
+
+
+
+```
+//weight of variables' cost
+int  weight_cte_cost = 30000;
+int  weight_epsi_cost = 110;
+int  weight_v_cost = 10;
+int  weight_delta_cost = 2000;
+int  weight_a_cost = 20;
+int  weight_delta_change_cost = 30000;
+int  weight_a_change_cost = 10;
+int  weight_epsi_change_cost = 20;
+```
+
+the data plot result examples are shown as below:  
+
+![alt text][image4]
+![alt text][image5]
+
+#### 6. Output the MPC predicted trajectory and reference trajectory.
+
+
+## Final conclusion:
+
+MPC model is much better than PID method, and under 80MPH it also works very well. There is also another theory used for solving non-linear MPC model, I think it's much better than MPC model, will investigate it.

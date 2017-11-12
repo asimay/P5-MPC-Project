@@ -7,7 +7,9 @@ cmake_minimum_required (VERSION 3.5)
 add_definitions(-std=c++11 -O3)
 
 set(CXX_FLAGS "-Wall")
-set(CMAKE_CXX_FLAGS  "${CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS, "${CXX_FLAGS}")
+
+find_package(PythonLibs 2.7)
 
 set(sources src/MPC.cpp src/main.cpp)
 
@@ -25,5 +27,6 @@ endif(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 add_executable(mpc ${sources})
 
-target_link_libraries(mpc ipopt z ssl uv uWS)
+target_include_directories(mpc PRIVATE ${PYTHON_INCLUDE_DIRS})
+target_link_libraries(mpc ipopt z ssl uv uWS ${PYTHON_LIBRARIES})
 

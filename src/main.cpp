@@ -9,13 +9,16 @@
 #include "Eigen-3.3/Eigen/QR"
 #include "MPC.h"
 #include "json.hpp"
+#include "matplotlibcpp.h"
+
+namespace plt = matplotlibcpp;
 
 // for convenience
 using json = nlohmann::json;
 
 
 #define LF  (2.67)
-#define DT  (0.1)
+#define DT  (0.09)
 
 // For converting back and forth between radians and degrees.
 constexpr double pi() {
@@ -85,8 +88,8 @@ Eigen::VectorXd MapToOdom(double ptx, double pty, double px, double py, double p
 
     Eigen::MatrixXd rotation(3,3);
     rotation << cos(psi),  -sin(psi), px,
-                sin(psi),   cos(psi), py,
-                0,	         0,         1;
+             sin(psi),   cos(psi), py,
+             0,	         0,         1;
     rotation = rotation.inverse();
 
     pt_car = rotation * pt_waypoint;
@@ -101,7 +104,10 @@ int main() {
     // MPC is initialized here!
     MPC mpc;
 
-    h.onMessage([&mpc](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
+    std::vector<double> vec_steer_value;
+    std::vector<double> vec_cte_value;
+
+    h.onMessage([&mpc, &vec_steer_value, &vec_cte_value](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length,
     uWS::OpCode opCode) {
         // "42" at the start of the message means there's a websocket message event.
         // The 4 signifies a websocket message
@@ -179,6 +185,11 @@ int main() {
                     msgJson["steering_angle"] = steer_value;
                     msgJson["throttle"] = throttle_value;
 
+                    //draw steering value rad to degree.
+                    vec_steer_value.push_back(rad2deg(steer_value));
+
+                    vec_cte_value.push_back(cte);
+
                     //Display the MPC predicted trajectory
                     vector<double> mpc_x_vals = {state[0]};
                     vector<double> mpc_y_vals = {state[1]};
@@ -204,7 +215,7 @@ int main() {
                     int number_points = 60;
 
                     for(int i = 1; i < number_points; i++) {
-					    double x = i * points_unit;
+                        double x = i * points_unit;
                         next_x_vals.push_back(x);
                         next_y_vals.push_back(polyeval(coeffs, x));
                     }
@@ -227,6 +238,26 @@ int main() {
                     ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
                 }
             } else {
+                //use manual control to control the parameter tuning plot.
+
+                if(vec_steer_value.size() > 0 ) {
+
+                    plt::named_plot("steer_value", vec_steer_value, "r-" );
+                    plt::named_plot("cte_value", vec_cte_value, "g-" );
+
+                    plt::xlim(0, 200);
+                    plt::ylim(-30, 30);
+                    //plt::ylim(-2, 2);  //for cte
+                    plt::xlabel("Iterater Times");
+                    plt::ylabel("Values");
+                    plt::legend();
+                    plt::save("./two_value_plot.png");
+                    //plt::save("./cte_plot.png");  //for cte
+                    vec_steer_value.clear();
+                    vec_cte_value.clear();
+
+                    exit(1);
+                }
                 // Manual driving
                 std::string msg = "42[\"manual\",{}]";
                 ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
