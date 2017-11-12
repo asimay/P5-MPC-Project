@@ -145,6 +145,9 @@ I expand the iterater times to 200 to observe more cases, the data plot result e
 ![alt text][image4]
 ![alt text][image5]
 
+above graph, steering values turns sharply after 100 step, it's OK, because there is a sharp turning road at that simulation time. 
+
+
 #### 6. Output the MPC predicted trajectory and reference trajectory.
 
 with new tuned parameters, the car runs good in simulation based on `v_ref = 100` condition, and the car speed can run at about **95MPH**.
