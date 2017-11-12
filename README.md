@@ -11,10 +11,10 @@ The goals / steps of this project are the following:
 [image3]: ./outputs/cte_plot_10000.png
 [image4]: ./outputs/two_value_plot1.png
 [image5]: ./outputs/two_value_plot2.png
-[image6]: ./outputs/1-80kmh.png
-[image7]: ./outputs/2-80kmh.png
-[image8]: ./outputs/8.png
-[image9]: ./outputs/9.png
+[image6]: ./outputs/1-80kmh.PNG
+[image7]: ./outputs/2-80kmh.PNG
+[image8]: ./outputs/8.jpg
+[image9]: ./outputs/9.jpg
 [image10]: ./outputs/equation.png
 
 Final result:
